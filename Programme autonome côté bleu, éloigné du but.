@@ -1,0 +1,269 @@
+package org.firstinspires.ftc.teamcode; 
+
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous; import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode; import com.qualcomm.robotcore.hardware.DcMotor; import com.qualcomm.robotcore.hardware.DcMotorSimple; import com.qualcomm.robotcore.hardware.Servo; 
+
+/** 
+
+Mode Autonome pour l'Alliance Bleue (Variante 2). 
+
+Ce programme utilise une nouvelle séquence de tir synchronisée pour les servos. 
+
+*/ @Autonomous(name="Autobleu - 2", group="Auto") public class AutoEncodeurBleu2 extends LinearOpMode { 
+
+// ======================================================== 
+// 1. DÉCLARATION DU MATÉRIEL (Hardware) 
+// ======================================================== 
+ 
+// Moteurs du châssis 
+private DcMotor moteurGauche; 
+private DcMotor moteurDroite; 
+ 
+// Moteurs des mécanismes 
+private DcMotor moteurTir;       // Roue de lancement 
+private DcMotor moteurRamassage; // Système d'aspiration 
+ 
+// Servomoteurs 
+private Servo servoTir;          // Poussoir principal 
+private Servo servoTir2;         // Agitateur/Poussoir secondaire 
+ 
+// ======================================================== 
+// 2. CONSTANTES PHYSIQUES ET MATHÉMATIQUES 
+// ======================================================== 
+ 
+// Constantes pour l'odométrie 
+static final double TICKS_PAR_TOUR = 560;  
+static final double DIAMETRE_ROUE_MM = 90.0; 
+static final double CIRCONFERENCE_MM = DIAMETRE_ROUE_MM * Math.PI; 
+static final double TICKS_PAR_MM = TICKS_PAR_TOUR / CIRCONFERENCE_MM; 
+static final double MULTIPLICATEUR_GLISSEMENT = 1.05;  
+ 
+// Constantes pour la rotation 
+static final double ENTRAXE_MM = 380.0;  
+ 
+// Paramètres du jeu 
+static final int NOMBRE_DE_BALLES = 3; 
+ 
+@Override 
+public void runOpMode() { 
+    
+   // ======================================================== 
+   // 3. INITIALISATION DU ROBOT 
+   // ======================================================== 
+   moteurGauche    = hardwareMap.get(DcMotor.class, "gauche"); 
+   moteurDroite    = hardwareMap.get(DcMotor.class, "Droite"); 
+   moteurTir       = hardwareMap.get(DcMotor.class, "Envole"); 
+   moteurRamassage = hardwareMap.get(DcMotor.class, "Pousse"); 
+   servoTir        = hardwareMap.get(Servo.class, "servo"); 
+   servoTir2       = hardwareMap.get(Servo.class, "servo1"); 
+ 
+   // Configuration des directions 
+   moteurGauche.setDirection(DcMotorSimple.Direction.REVERSE); 
+   moteurDroite.setDirection(DcMotorSimple.Direction.FORWARD); 
+ 
+   // Position initiale des servos 
+   servoTir.setPosition(0.0);    
+   servoTir2.setPosition(0.5); 
+ 
+   // Reset des encodeurs 
+   moteurGauche.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER); 
+   moteurDroite.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER); 
+   moteurGauche.setMode(DcMotor.RunMode.RUN_USING_ENCODER); 
+   moteurDroite.setMode(DcMotor.RunMode.RUN_USING_ENCODER); 
+ 
+   telemetry.addLine("Auto Prêt. En attente du départ..."); 
+   telemetry.update(); 
+ 
+   waitForStart(); 
+ 
+   // ======================================================== 
+   // 4. SÉQUENCE AUTONOME 
+   // ======================================================== 
+   if (opModeIsActive()) { 
+ 
+       // --- PARTIE 1 : PLACEMENT ET PREMIER TIR --- 
+ 
+       // Étape 1 : Déplacement initial de 10 cm (100 mm) 
+       avancerDistance(-100, 0.7); 
+       sleep(300); // Pause pour stabiliser 
+ 
+       // Étape 2 : S'orienter pour le premier tir (Rotation de -30 degrés) 
+       tournerAngle(-30, 0.4); 
+       sleep(300); 
+ 
+       // Étape 3 : Tirer les 3 balles pré-chargées (Vitesse très forte : -84%) 
+       sequenceDeTir(NOMBRE_DE_BALLES, -0.84); 
+       sleep(300); 
+        
+       // --- PARTIE 2 : TRAJET VERS LA ZONE DE RAMASSAGE --- 
+ 
+       // Étape 4 : Se réaligner (Rotation de 30 degrés pour annuler le virage précédent) 
+       tournerAngle(30, 0.4); 
+       sleep(300); 
+        
+       // Étape 5 : S'approcher de la zone de ramassage (Déplacement de 56 cm) 
+       avancerDistance(-560, 0.7); 
+       sleep(300); 
+ 
+       // Étape 6 : S'aligner avec la rangée de balles (Rotation de -95 degrés) 
+       tournerAngle(-95, 0.4); 
+       sleep(300); 
+ 
+       // --- PARTIE 3 : RAMASSAGE --- 
+ 
+       // Étape 7 : Ramassage sur 100 cm (80 cm normal + 20 cm ralenti) 
+       moteurRamassage.setPower(1.0); // Allumer le ramassage 
+       avancerDistance(-800, 0.7);     // Avancer de 80 cm 
+       avancerDistance(-200, 0.2);     // Avancer de 20 cm au ralenti 
+       sleep(200); 
+        
+       // On laisse tourner légèrement le ramassage pour garder les balles dans le robot 
+       moteurRamassage.setPower(0.2);  
+ 
+       // --- PARTIE 4 : RETOUR POUR LE DEUXIÈME TIR --- 
+        
+       // Étape 8 : Chemin de retour (chemin inverse exact) 
+        
+       // A. Reculer de 90 cm (quitter la zone des balles) 
+       avancerDistance(900, 0.7); 
+       sleep(300); 
+ 
+       // B. Tourner de 95 degrés (annuler le virage de l'étape 6) 
+       tournerAngle(95, 0.4); 
+       sleep(300); 
+ 
+       // C. Reculer de 50 cm pour se rapprocher du point de tir initial 
+       avancerDistance(500, 0.7); 
+       sleep(300); 
+ 
+       // D. Ajustement de l'angle de tir (Rotation de -28 degrés) 
+       tournerAngle(-28, 0.4); 
+       sleep(300); 
+        
+       // Étape 9 : Tirer les 3 balles récupérées (Vitesse : -80%) 
+       sequenceDeTir(NOMBRE_DE_BALLES, -0.80); 
+        
+       // --- PARTIE 5 : STATIONNEMENT FINAL --- 
+ 
+       // Étape 10 : Déplacement final de 100 cm pour libérer la zone ou se garer 
+       avancerDistance(-1000, 0.7); 
+        
+       // Fin de la séquence 
+       telemetry.addLine("Séquence terminée !"); 
+       telemetry.update(); 
+       sleep(2000); 
+   } 
+} 
+ 
+// ======================================================== 
+// 5. BOÎTE À OUTILS (Méthodes personnalisées) 
+// ======================================================== 
+ 
+/** 
+* Déplace le robot en ligne droite. 
+*/ 
+public void avancerDistance(double millimetres, double puissance) { 
+   int cibleGauche = moteurGauche.getCurrentPosition() + (int)(millimetres * TICKS_PAR_MM * MULTIPLICATEUR_GLISSEMENT); 
+   int cibleDroite = moteurDroite.getCurrentPosition() + (int)(millimetres * TICKS_PAR_MM * MULTIPLICATEUR_GLISSEMENT); 
+ 
+   moteurGauche.setTargetPosition(cibleGauche); 
+   moteurDroite.setTargetPosition(cibleDroite); 
+ 
+   moteurGauche.setMode(DcMotor.RunMode.RUN_TO_POSITION); 
+   moteurDroite.setMode(DcMotor.RunMode.RUN_TO_POSITION); 
+ 
+   moteurGauche.setPower(Math.abs(puissance)); 
+   moteurDroite.setPower(Math.abs(puissance)); 
+ 
+   while (opModeIsActive() && (moteurGauche.isBusy() || moteurDroite.isBusy())) { 
+       telemetry.addData("Action", "Déplacement ligne droite"); 
+       telemetry.update(); 
+   } 
+ 
+   moteurGauche.setPower(0); 
+   moteurDroite.setPower(0); 
+   moteurGauche.setMode(DcMotor.RunMode.RUN_USING_ENCODER); 
+   moteurDroite.setMode(DcMotor.RunMode.RUN_USING_ENCODER); 
+} 
+ 
+/** 
+* Fait tourner le robot sur lui-même. 
+*/ 
+public void tournerAngle(double degres, double puissance) { 
+   double distanceArcMm = (degres / 360.0) * Math.PI * ENTRAXE_MM; 
+   int ticksRequis = (int)(distanceArcMm * TICKS_PAR_MM); 
+ 
+   int cibleGauche = moteurGauche.getCurrentPosition() - ticksRequis; 
+   int cibleDroite = moteurDroite.getCurrentPosition() + ticksRequis; 
+ 
+   moteurGauche.setTargetPosition(cibleGauche); 
+   moteurDroite.setTargetPosition(cibleDroite); 
+ 
+   moteurGauche.setMode(DcMotor.RunMode.RUN_TO_POSITION); 
+   moteurDroite.setMode(DcMotor.RunMode.RUN_TO_POSITION); 
+ 
+   moteurGauche.setPower(Math.abs(puissance)); 
+   moteurDroite.setPower(Math.abs(puissance)); 
+ 
+   while (opModeIsActive() && (moteurGauche.isBusy() || moteurDroite.isBusy())) { 
+       telemetry.addData("Action", "Rotation de " + degres + " degrés"); 
+       telemetry.update(); 
+   } 
+ 
+   moteurGauche.setPower(0); 
+   moteurDroite.setPower(0); 
+   moteurGauche.setMode(DcMotor.RunMode.RUN_USING_ENCODER); 
+   moteurDroite.setMode(DcMotor.RunMode.RUN_USING_ENCODER); 
+} 
+ 
+/** 
+* Gère la nouvelle séquence de tir avec un décalage (delay) entre les deux servos. 
+* @param nombreDeBalles Nombre de tirs à effectuer. 
+* @param puissanceTir   Vitesse appliquée à la roue de lancement. 
+*/ 
+public void sequenceDeTir(int nombreDeBalles, double puissanceTir) { 
+   telemetry.addLine("Préparation du tir..."); 
+   telemetry.update(); 
+ 
+   // 1. Allumer le lanceur ET LE RAMASSAGE 
+   moteurTir.setPower(puissanceTir); 
+   moteurRamassage.setPower(1.0); // Le ramassage reste allumé pour forcer les balles vers le haut 
+    
+   // Laisser le temps à la roue de tir d'atteindre sa vitesse max (1.9 secondes) 
+   sleep(1900);  
+ 
+   // 2. Boucle pour tirer X balles 
+   for(int i = 0; i < nombreDeBalles; i++) { 
+       if (!opModeIsActive()) break; // Sécurité si on arrête le robot 
+ 
+       telemetry.addData("Tir", "Balle " + (i+1) + " sur " + nombreDeBalles); 
+       telemetry.update(); 
+ 
+       // A. Pousser la balle (premier servo s'étend) 
+       servoTir.setPosition(0.5);  
+        
+       // B. Petit délai pour laisser la balle avancer 
+       sleep(90); 
+        
+       // C. Activer le servo 2 en renfort (90ms après le premier) 
+       servoTir2.setPosition(1.0); 
+        
+       // D. Laisser du temps aux servos pour qu'ils aillent au bout de leur course 
+       sleep(360); 
+ 
+       // E. Rétracter les deux servos en même temps pour faire de la place 
+       servoTir.setPosition(0.0);  
+       servoTir2.setPosition(0.5);  
+        
+       // F. Délai d'une seconde AVANT de tirer la prochaine balle (pour que le moteur reprenne de sa vitesse) 
+       sleep(1000);  
+   } 
+ 
+   // 3. Tout éteindre après les tirs 
+   moteurTir.setPower(0); 
+   moteurRamassage.setPower(0); 
+} 
+ 
+
+} 
+
+ 
