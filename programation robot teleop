@@ -1,0 +1,337 @@
+package org.firstinspires.ftc.teamcode;  
+
+   
+
+import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;  
+
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;  
+
+import com.qualcomm.robotcore.hardware.DcMotor;  
+
+import com.qualcomm.robotcore.hardware.DcMotorSimple;  
+
+import com.qualcomm.robotcore.hardware.Servo;  
+
+import com.qualcomm.robotcore.util.Range;  
+
+   
+
+@TeleOp(name = "Robot Principal", group = "Linear Opmode")  
+
+public class programmeteleop extends LinearOpMode {  
+
+   
+
+    // Déclaration des variables matérielles  
+
+    private Servo servoTir;  
+
+    private Servo servoTir2;  
+
+    private DcMotor moteurTir;         
+
+    private DcMotor moteurRamassage;   
+
+    private DcMotor moteurGauche;  
+
+    private DcMotor moteurDroite;  
+
+     
+
+    // --- VARIABLES POUR L'ENCODEUR DE TIR --- 
+
+    // Un moteur REV nu (sans réducteur) compte 28 Ticks par tour 
+
+    static final int TICKS_PAR_TOUR_NU = 28;  
+
+     
+
+    // Nombre de tours que la roue doit faire "à vide" avant d'autoriser le tir. 
+
+    // À pleine vitesse (6000 RPM), 20 tours prennent environ 150 millisecondes. 
+
+    static final int TOURS_MINIMUM_AVANT_TIR = 20;  
+
+  
+
+    private int positionDepartTir = 0; 
+
+    private boolean moteurTourne = false; 
+
+   
+
+    @Override  
+
+    public void runOpMode() {  
+
+          
+
+        // 1. INITIALISATION DU MATÉRIEL  
+
+        servoTir = hardwareMap.get(Servo.class, "servo");  
+
+        servoTir2 = hardwareMap.get(Servo.class, "servo1");   
+
+   
+
+        moteurTir = hardwareMap.get(DcMotor.class, "Envole");  
+
+        moteurRamassage = hardwareMap.get(DcMotor.class, "Pousse");  
+
+        moteurGauche = hardwareMap.get(DcMotor.class, "gauche");  
+
+        moteurDroite = hardwareMap.get(DcMotor.class, "Droite");  
+
+   
+
+        // Paramétrage du sens de rotation des moteurs  
+
+        moteurGauche.setDirection(DcMotorSimple.Direction.REVERSE);  
+
+        moteurDroite.setDirection(DcMotorSimple.Direction.FORWARD);  
+
+  
+
+        // Initialisation de l'encodeur du moteur de tir 
+
+        moteurTir.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER); 
+
+        // On le met en RUN_WITHOUT_ENCODER pour contrôler la puissance en % 
+
+        // tout en gardant la possibilité de lire les Ticks en arrière-plan. 
+
+        moteurTir.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER); 
+
+   
+
+        // Position de départ des servos  
+
+        servoTir.setPosition(0.0);   // Position initiale (0 degré)  
+
+        servoTir2.setPosition(0.5);  // Position initiale décalée à 90 degrés  
+
+   
+
+        telemetry.addData("Statut", "Initialisation terminée. Prêt à démarrer !");  
+
+        telemetry.update();  
+
+   
+
+        // Attendre que le pilote appuie sur "PLAY"  
+
+        waitForStart();  
+
+   
+
+        // 2. BOUCLE PRINCIPALE  
+
+        while (opModeIsActive()) {  
+
+   
+
+            // --------------------------------------------------------  
+
+            // ALLUMAGE DES ROUES DE TIR (Puissances variables) 
+
+            // --------------------------------------------------------  
+
+            boolean boutonTirAppuye = gamepad1.x || gamepad1.y || gamepad1.b || gamepad1.a; 
+
+  
+
+            if (boutonTirAppuye) {  
+
+                // Si on vient juste d'allumer le moteur, on mémorise sa position d'encodeur 
+
+                if (!moteurTourne) { 
+
+                    positionDepartTir = moteurTir.getCurrentPosition(); 
+
+                    moteurTourne = true; 
+
+                } 
+
+                 
+
+                // Application de la puissance selon le bouton 
+
+                if (gamepad1.x) {  
+
+                    moteurTir.setPower(-1.0);   // Carré = 100%  
+
+                } else if (gamepad1.y) {  
+
+                    moteurTir.setPower(-0.82);  // Triangle = 82%  
+
+                } else if (gamepad1.b) {  
+
+                    moteurTir.setPower(-0.70);  // Rond = 70%  
+
+                } else if (gamepad1.a) {  
+
+                    moteurTir.setPower(-0.60);  // Croix = 60%  
+
+                }  
+
+            } else {  
+
+                moteurTir.setPower(0.0);    // Arrêt  
+
+                moteurTourne = false;       // Le moteur ne tourne plus 
+
+            }  
+
+   
+
+            // --------------------------------------------------------  
+
+            // DÉCLENCHEMENT DU 1er SERVO (Gâchette R2)  
+
+            // --------------------------------------------------------  
+
+            // On calcule combien de ticks le moteur a fait depuis son allumage 
+
+            int ticksParcourus = Math.abs(moteurTir.getCurrentPosition() - positionDepartTir); 
+
+            int toursParcourus = ticksParcourus / TICKS_PAR_TOUR_NU; 
+
+  
+
+            // SÉCURITÉ : La gâchette est pressée ET le moteur a fait au moins 15 tours 
+
+            if (gamepad1.right_trigger > 0.5 && moteurTourne && toursParcourus >= TOURS_MINIMUM_AVANT_TIR) {  
+
+                servoTir.setPosition(0.5); // Avance de 90°  
+
+            } else {  
+
+                servoTir.setPosition(0.0); // Retour au repos  
+
+            }  
+
+   
+
+            // --------------------------------------------------------  
+
+            // DÉCLENCHEMENT DU 2ème SERVO (Bouton R1)  
+
+            // --------------------------------------------------------  
+
+            // COMPORTEMENT NORMAL : Indépendant 
+
+            if (gamepad1.right_bumper) {  
+
+                servoTir2.setPosition(1.0); // Avance de 90° supplémentaires  
+
+            } else {  
+
+                servoTir2.setPosition(0.5); // Retour au repos (qui est à 90° / 0.5)  
+
+            }  
+
+   
+
+            // --------------------------------------------------------  
+
+            // SYSTÈME DE RAMASSAGE (L2 et Flèche du Bas)  
+
+            // --------------------------------------------------------  
+
+            // Gâchette L2 = Ramasser (Monter les balles)  
+
+            if (gamepad1.left_trigger > 0.5) {  
+
+                moteurRamassage.setPower(1.0);  
+
+            }   
+
+            // Flèche du Bas = Recracher (Descendre les balles)  
+
+            else if (gamepad1.dpad_down) {  
+
+                moteurRamassage.setPower(-1.0);  
+
+            }   
+
+            // Si rien n'est appuyé = Arrêt  
+
+            else {  
+
+                moteurRamassage.setPower(0.0);  
+
+            }  
+
+   
+
+            // --------------------------------------------------------  
+
+            // CONDUITE DU ROBOT (Joysticks)  
+
+            // --------------------------------------------------------  
+
+            double avancer = gamepad1.left_stick_y;   
+
+            double tourner = -gamepad1.left_stick_x;  
+
+   
+
+            double puissanceGauche = avancer + tourner;  
+
+            double puissanceDroite = avancer - tourner;  
+
+   
+
+            moteurGauche.setPower(Range.clip(puissanceGauche, -1.0, 1.0));  
+
+            moteurDroite.setPower(Range.clip(puissanceDroite, -1.0, 1.0));  
+
+   
+
+            // --------------------------------------------------------  
+
+            // AFFICHAGE (Telemetry)  
+
+            // --------------------------------------------------------  
+
+              
+
+            // --- RÉCAPITULATIF PERMANENT DES COMMANDES ---  
+
+            telemetry.addLine("=== COMMANDES DU ROBOT ===");  
+
+            telemetry.addLine("Conduite : Joystick Gauche");  
+
+            telemetry.addLine("Lanceur : Carré (100%) | Triangle (80%)");  
+
+            telemetry.addLine("Lanceur : Rond (70%) | Croix (60%)");  
+
+            telemetry.addLine("Servos Tir : R2 (Servo 1 - Par Encodeur) | R1 (Servo 2 - Libre)");  
+
+            telemetry.addLine("Ramassage : L2 (Monter) | Flèche Bas (Recracher)");  
+
+            telemetry.addLine("==========================");  
+
+              
+
+            // --- ÉTAT DU ROBOT EN DIRECT ---  
+
+            telemetry.addData("Tours du Lanceur", moteurTourne ? toursParcourus : 0); 
+
+            telemetry.addData("Servo 1 Prêt ?", (toursParcourus >= TOURS_MINIMUM_AVANT_TIR) ? "OUI" : "NON (Attente vitesse)"); 
+
+            telemetry.addData("Servo 1 (R2)", gamepad1.right_trigger > 0.5 ? "Bouton Pressé" : "Repos");  
+
+            telemetry.addData("Moteur Gauche", puissanceGauche);  
+
+            telemetry.addData("Moteur Droit", puissanceDroite);  
+
+              
+
+            telemetry.update(); // Met à jour l'écran avec toutes ces informations  
+
+        }  
+
+    }  
+
+} 
